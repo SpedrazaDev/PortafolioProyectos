@@ -496,6 +496,8 @@
                 </div>
             </div>
 
+            <!-- Aquí puedes agregar más proyectos copiando el bloque project-card -->
+
         </section>
     </div>
 
@@ -510,12 +512,16 @@
 
         async function fetchReadme(owner, repo) {
             try {
-                // Intentar primero con el formato raw para mejor codificación
-                const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
-                    headers: {
-                        'Accept': 'application/vnd.github.v3.raw'
-                    }
-                });
+                // Usar raw.githubusercontent.com directamente (sin CORS)
+                const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/README.md`;
+
+                let response = await fetch(rawUrl);
+
+                // Si falla con 'main', intentar con 'master'
+                if (!response.ok) {
+                    const masterUrl = `https://raw.githubusercontent.com/${owner}/${repo}/master/README.md`;
+                    response = await fetch(masterUrl);
+                }
 
                 if (!response.ok) {
                     throw new Error('README no encontrado');
@@ -528,37 +534,15 @@
                     breaks: true,
                     gfm: true,
                     headerIds: true,
-                    mangle: false
+                    mangle: false,
+                    pedantic: false,
+                    sanitize: false
                 });
 
                 return marked.parse(readmeContent);
             } catch (error) {
-                // Si falla, intentar con el método base64
-                try {
-                    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, {
-                        headers: {
-                            'Accept': 'application/vnd.github+json'
-                        }
-                    });
-
-                    if (!response.ok) {
-                        throw new Error('README no encontrado');
-                    }
-
-                    const data = await response.json();
-                    const readmeContent = atob(data.content);
-
-                    marked.setOptions({
-                        breaks: true,
-                        gfm: true,
-                        headerIds: true,
-                        mangle: false
-                    });
-
-                    return marked.parse(readmeContent);
-                } catch (e) {
-                    return `<p style="color: #e74c3c; font-weight: 500;">❌ Error: No se pudo cargar el README. ${error.message}</p>`;
-                }
+                return `<p style="color: #e74c3c; font-weight: 500;">❌ Error: No se pudo cargar el README. ${error.message}</p>
+                        <p style="color: #666; font-size: 0.9rem;">Asegúrate de que el repositorio tenga un archivo README.md en la rama main o master.</p>`;
             }
         }
 
